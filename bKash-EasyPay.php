@@ -149,9 +149,9 @@ public function payment_fields(){
     ?>
     <div style="margin-bottom: 10px;">
         <span><strong>bKash Number <?php echo ($this->number_type == 'Agent') ? '(Cash Out)' : '(Send Money)'; ?>:</strong> <span id="bkash-number-display" style="font-size: 16px; font-weight: normal;"><?php echo $this->bKash_number; ?></span></span>
-        <button type="button" id="copy-bkash-number" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer;">Copy</button>
+        <button type="button" id="copy-bkash-number" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer; background: #e2136e; border-radius: 25px; color: #fff;">Copy</button>
         <?php if (!empty($this->bKash_qr_code)): ?>
-            <button type="button" id="toggle-qr-code" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer;">Show QR Code</button>
+            <button type="button" id="toggle-qr-code" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer; background: #e2136e; border-radius: 25px; color: #fff;">Show QR Code</button>
         <?php endif; ?>
     </div>
     
@@ -267,7 +267,7 @@ public function payment_fields(){
 	 * If bKash charge is activated
 	 */
 	$bKash_charge = get_option( 'woocommerce_pay_bKash_settings' );
-	if( $bKash_charge['bKash_charge'] == 'yes' ){
+	if( $bKash_charge['bKash_charge'] == 'yes' ){ 
 
 		add_action( 'wp_enqueue_scripts', 'pay_bKash_script' );
 		function pay_bKash_script(){
