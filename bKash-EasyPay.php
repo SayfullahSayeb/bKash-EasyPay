@@ -149,7 +149,7 @@ public function payment_fields(){
     ?>
     <div style="margin-bottom: 10px;">
         <span><strong>bKash Number <?php echo ($this->number_type == 'Agent') ? '(Cash Out)' : '(Send Money)'; ?>:</strong> <span id="bkash-number-display" style="font-size: 16px; font-weight: normal;"><?php echo $this->bKash_number; ?></span></span>
-        <button type="button" id="copy-bkash-number" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer; background: #e2136e; border-radius: 25px; color: #fff;">Copy</button>
+        <button type="button" id="copy-bkash-number" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer; background: #e2136e; border-radius: 25px; color: #fff;">Copy Number</button>
         <?php if (!empty($this->bKash_qr_code)): ?>
             <button type="button" id="toggle-qr-code" style="margin-left: 10px; font-size: 14px; padding: 2px 8px; cursor: pointer; background: #e2136e; border-radius: 25px; color: #fff;">Show QR Code</button>
         <?php endif; ?>
