@@ -562,11 +562,26 @@ function pay_bKash_qr_upload_script() {
     </script>
 	<?php
 }
-// Add a custom admin menu item for bKash settings
+
+
+// CSS to resize menu icon
+add_action('admin_head', function() {
+    ?>
+    <style>
+        #toplevel_page_pay_bKash_settings_menu .wp-menu-image img {
+            width: 20px !important;
+            height: 20px !important;
+        }
+    </style>
+    <?php
+});
+
+
 add_action('admin_menu', 'pay_bKash_admin_menu');
 function pay_bKash_admin_menu() {
     $icon_url = plugins_url('images/bkash.png', __FILE__);
-
+    
+    // Main menu
     add_menu_page(
         'bKash Settings',  
         'bKash EasyPay',                                     
@@ -580,16 +595,407 @@ function pay_bKash_admin_menu() {
         $icon_url,  
         55          
     );
+    
+    // Add Transaction Information submenu
+    add_submenu_page(
+        'pay_bKash_settings_menu',
+        'Transaction Information',
+        'Transaction Information',
+        'manage_options',
+        'pay_bKash_transactions',
+        'pay_bKash_transactions_page'
+    );
 }
 
-// CSS to resize menu icon
-add_action('admin_head', function() {
+
+
+/**
+ * Transaction Information page
+ */
+function pay_bKash_transactions_page() {
+    // Handle search
+    $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+    
+    // Pagination
+    $per_page = 20;
+    $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+    $offset = ($current_page - 1) * $per_page;
+    
+    // Get total count for all bKash transactions (not filtered)
+    $total_all_args = array(
+        'limit' => -1,
+        'payment_method' => 'pay_bKash',
+        'return' => 'ids'
+    );
+    $total_all_orders = count(wc_get_orders($total_all_args));
+    
+    // Handle search functionality FIRST
+    $search_order_ids = array();
+    $search_results_count = 0;
+    
+    if (!empty($search)) {
+        // Get all bKash orders first
+        $all_bkash_orders = wc_get_orders(array(
+            'limit' => -1,
+            'payment_method' => 'pay_bKash',
+            'return' => 'ids'
+        ));
+        
+        foreach ($all_bkash_orders as $order_id) {
+            // Check if this is an order ID match
+            if (is_numeric($search) && $order_id == intval($search)) {
+                $search_order_ids[] = $order_id;
+                continue;
+            }
+            
+            // Get the bKash number using the same methods we use for display
+            $order = wc_get_order($order_id);
+            if (!$order) continue;
+            
+            // Try multiple ways to get the bKash number (same as display logic)
+            $bkash_number = '';
+            
+            // Method 1: Try the meta key we save
+            $bkash_number = $order->get_meta('_bKash_number', true);
+            
+            // Method 2: If not found, try without underscore
+            if (empty($bkash_number)) {
+                $bkash_number = $order->get_meta('bKash_number', true);
+            }
+            
+            // Method 3: Try get_post_meta as fallback
+            if (empty($bkash_number)) {
+                $bkash_number = get_post_meta($order_id, '_bKash_number', true);
+            }
+            
+            // Method 4: Try alternative meta key
+            if (empty($bkash_number)) {
+                $bkash_number = get_post_meta($order_id, 'bKash_number', true);
+            }
+            
+            // Check if the bKash number matches the search term
+            if (!empty($bkash_number) && stripos($bkash_number, $search) !== false) {
+                $search_order_ids[] = $order_id;
+            }
+        }
+        
+        // Remove duplicates
+        $search_order_ids = array_unique($search_order_ids);
+        $search_results_count = count($search_order_ids);
+    }
+    
+    // Now get orders with proper filtering
+    $args = array(
+        'payment_method' => 'pay_bKash',
+        'return' => 'objects',
+        'orderby' => 'date',
+        'order' => 'DESC'
+    );
+    
+    if (!empty($search)) {
+        if (!empty($search_order_ids)) {
+            // We have search results - get only those specific orders
+            $args['post__in'] = $search_order_ids;
+            $args['limit'] = $per_page;
+            $args['offset'] = $offset;
+        } else {
+            // No search results found - return empty
+            $orders = array();
+            $total_orders = 0;
+            $total_pages = 0;
+        }
+    } else {
+        // No search - get all with pagination
+        $args['limit'] = $per_page;
+        $args['offset'] = $offset;
+    }
+    
+    // Get orders only if we have results to show
+    if (!isset($orders)) {
+        $orders = wc_get_orders($args);
+        
+        // Get total count for pagination
+        if (!empty($search) && !empty($search_order_ids)) {
+            $total_orders = count($search_order_ids);
+        } else {
+            $total_count_args = array(
+                'limit' => -1,
+                'payment_method' => 'pay_bKash',
+                'return' => 'ids'
+            );
+            $total_orders = count(wc_get_orders($total_count_args));
+        }
+        
+        $total_pages = ceil($total_orders / $per_page);
+    }
+    
     ?>
+    <div class="wrap">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="margin: 0;"><?php esc_html_e('bKash Transaction Information', 'stb'); ?></h1>
+            
+            <!-- Export Button - Top Right -->
+            <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=pay_bKash_transactions&action=export_csv'), 'export_bkash_csv'); ?>" 
+               class="button button-secondary">
+                <span class="dashicons dashicons-download" style="vertical-align: middle; margin-right: 5px;"></span>
+                <?php esc_html_e('Export to CSV', 'stb'); ?>
+            </a>
+        </div>
+        
+        <!-- Search Form with Results Summary -->
+        <div style="background: #fff; padding: 15px; margin: 20px 0; border: 1px solid #ccd0d4;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <!-- Left side: Total Transactions and Search Results -->
+                <div>
+                    <strong><?php esc_html_e('Total Transactions:', 'stb'); ?></strong> <?php echo $total_all_orders; ?>
+                    <?php if (!empty($search)): ?>
+                        | <strong><?php esc_html_e('Search Results:', 'stb'); ?></strong> <?php echo $search_results_count; ?>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Right side: Search Form -->
+                <form method="get" action="" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="hidden" name="page" value="pay_bKash_transactions">
+                    <label for="search"><strong><?php esc_html_e('Search:', 'stb'); ?></strong></label>
+                    <input type="text" 
+                           id="search" 
+                           name="search" 
+                           value="<?php echo esc_attr($search); ?>" 
+                           placeholder="<?php esc_attr_e('Order ID or bKash Number', 'stb'); ?>"
+                           style="width: 200px;">
+                    <input type="submit" class="button button-primary" value="<?php esc_attr_e('Search', 'stb'); ?>">
+                    <?php if (!empty($search)): ?>
+                        <a href="<?php echo admin_url('admin.php?page=pay_bKash_transactions'); ?>" class="button">
+                            <?php esc_html_e('Clear', 'stb'); ?>
+                        </a>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Transactions Table -->
+        <div style="background: #fff; margin: 20px 0;">
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;"><strong><?php esc_html_e('Order ID', 'stb'); ?></strong></th>
+                        <th style="width: 120px;"><strong><?php esc_html_e('Payment Method', 'stb'); ?></strong></th>
+                        <th style="width: 130px;"><strong><?php esc_html_e('bKash Number', 'stb'); ?></strong></th>
+                        <th style="width: 100px;"><strong><?php esc_html_e('Amount', 'stb'); ?></strong></th>
+                        <th style="width: 120px;"><strong><?php esc_html_e('Date', 'stb'); ?></strong></th>
+                        <th style="width: 120px;"><strong><?php esc_html_e('Order Status', 'stb'); ?></strong></th>
+                        <th style="width: 100px;"><strong><?php esc_html_e('Action', 'stb'); ?></strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($orders)): ?>
+                        <?php foreach ($orders as $order): ?>
+                            <?php 
+                            if (!$order) continue;
+                            
+                            $order_id = $order->get_id();
+                            
+                            // Try multiple ways to get the bKash number
+                            $bkash_number = '';
+                            
+                            // Method 1: Try the meta key we save
+                            $bkash_number = $order->get_meta('_bKash_number', true);
+                            
+                            // Method 2: If not found, try without underscore
+                            if (empty($bkash_number)) {
+                                $bkash_number = $order->get_meta('bKash_number', true);
+                            }
+                            
+                            // Method 3: Try get_post_meta as fallback
+                            if (empty($bkash_number)) {
+                                $bkash_number = get_post_meta($order_id, '_bKash_number', true);
+                            }
+                            
+                            // Method 4: Try alternative meta key
+                            if (empty($bkash_number)) {
+                                $bkash_number = get_post_meta($order_id, 'bKash_number', true);
+                            }
+                            
+                            $order_total = $order->get_total();
+                            $order_date = $order->get_date_created();
+                            $order_status = $order->get_status();
+                            $status_name = wc_get_order_status_name($order_status);
+                            ?>
+                            <tr>
+                                <td><strong>#<?php echo $order_id; ?></strong></td>
+                                <td>
+                                    <img src="<?php echo plugins_url('images/bkash.png', __FILE__); ?>" 
+                                         alt="bKash" style="width: 20px; height: auto; margin-right: 5px;">
+                                    bKash
+                                </td>
+                                <td>
+                                    <?php if (!empty($bkash_number)): ?>
+                                        <strong><?php echo esc_html($bkash_number); ?></strong>
+                                    <?php else: ?>
+                                        <em style="color: #999;"><?php esc_html_e('Not provided', 'stb'); ?></em>
+                                    <?php endif; ?>
+                                </td>
+                                <td><strong><?php echo wc_price($order_total); ?></strong></td>
+                                <td><?php echo $order_date->date('Y-m-d H:i:s'); ?></td>
+                                <td>
+                                    <span class="order-status status-<?php echo esc_attr($order_status); ?>" 
+                                          style="padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; 
+                                                 background-color: <?php echo pay_bKash_get_status_color($order_status); ?>; 
+                                                 color: white;">
+                                        <?php echo esc_html($status_name); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="<?php echo admin_url('admin.php?page=wc-orders&action=edit&id=' . $order_id); ?>" 
+                                       class="button button-small button-primary">
+                                        <?php esc_html_e('View/Edit', 'stb'); ?>
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px;">
+                                <p style="font-size: 16px; color: #666;">
+                                    <?php 
+                                    if (!empty($search)) {
+                                        esc_html_e('No transactions found for your search.', 'stb');
+                                    } else {
+                                        esc_html_e('No bKash transactions found.', 'stb');
+                                    }
+                                    ?>
+                                </p>
+                                <p style="color: #999; font-size: 14px;">
+                                    <?php esc_html_e('Make sure you have orders with bKash payment method.', 'stb'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+            <div class="tablenav bottom">
+                <div class="tablenav-pages">
+                    <span class="displaying-num">
+                        <?php printf(esc_html__('%d items', 'stb'), $total_orders); ?>
+                    </span>
+                    
+                    <?php
+                    $base_url = admin_url('admin.php?page=pay_bKash_transactions');
+                    if (!empty($search)) {
+                        $base_url .= '&search=' . urlencode($search);
+                    }
+                    
+                    echo paginate_links(array(
+                        'base' => $base_url . '%_%',
+                        'format' => '&paged=%#%',
+                        'current' => $current_page,
+                        'total' => $total_pages,
+                        'prev_text' => '&laquo; ' . esc_html__('Previous', 'stb'),
+                        'next_text' => esc_html__('Next', 'stb') . ' &raquo;'
+                    ));
+                    ?>
+                </div>
+            </div>
+        <?php endif; ?>
+        
     <style>
-        #toplevel_page_pay_bKash_settings_menu .wp-menu-image img {
-            width: 20px !important;
-            height: 20px !important;
+        .order-status {
+            display: inline-block;
+            min-width: 80px;
+            text-align: center;
         }
     </style>
     <?php
-});
+}
+
+/**
+ * Get status color for better visual representation
+ */
+function pay_bKash_get_status_color($status) {
+    $colors = array(
+        'pending' => '#f56e28',
+        'processing' => '#c8d7e1',
+        'on-hold' => '#f8dda7',
+        'completed' => '#c8d7e1',
+        'cancelled' => '#e5e5e5',
+        'refunded' => '#e5e5e5',
+        'failed' => '#d63638'
+    );
+    
+    return isset($colors[$status]) ? $colors[$status] : '#666';
+}
+
+/**
+ * Handle CSV export
+ */
+add_action('admin_init', 'pay_bKash_handle_csv_export');
+function pay_bKash_handle_csv_export() {
+    if (!isset($_GET['page']) || $_GET['page'] !== 'pay_bKash_transactions' || 
+        !isset($_GET['action']) || $_GET['action'] !== 'export_csv') {
+        return;
+    }
+    
+    if (!wp_verify_nonce($_GET['_wpnonce'], 'export_bkash_csv') || !current_user_can('manage_options')) {
+        wp_die(__('Security check failed.', 'stb'));
+    }
+    
+    // Get all bKash orders using WooCommerce method
+    $args = array(
+        'limit' => -1,
+        'payment_method' => 'pay_bKash',
+        'return' => 'ids'
+    );
+    
+    $order_ids = wc_get_orders($args);
+    
+    // Set headers for CSV download
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="bkash-transactions-' . date('Y-m-d') . '.csv"');
+    
+    // Create output stream
+    $output = fopen('php://output', 'w');
+    
+    // Add CSV headers
+    fputcsv($output, array(
+        'Order ID',
+        'Payment Method',
+        'bKash Number',
+        'Amount',
+        'Date',
+        'Order Status'
+    ));
+    
+    // Add data rows
+    foreach ($order_ids as $order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) continue;
+        
+        // Try multiple methods to get bKash number
+        $bkash_number = $order->get_meta('_bKash_number', true);
+        if (empty($bkash_number)) {
+            $bkash_number = $order->get_meta('bKash_number', true);
+        }
+        if (empty($bkash_number)) {
+            $bkash_number = get_post_meta($order_id, '_bKash_number', true);
+        }
+        if (empty($bkash_number)) {
+            $bkash_number = get_post_meta($order_id, 'bKash_number', true);
+        }
+        
+        fputcsv($output, array(
+            $order_id,
+            'bKash',
+            $bkash_number,
+            $order->get_total(),
+            $order->get_date_created()->date('Y-m-d H:i:s'),
+            wc_get_order_status_name($order->get_status())
+        ));
+    }
+    
+    fclose($output);
+    exit;
+}
