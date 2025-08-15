@@ -3,7 +3,7 @@
 Plugin Name: bKash EasyPay
 Plugin URI:  https://labartise.com
 Description: bKash EasyPay is a manual payment gateway for WooCommerce that allows customers to pay via bKash.
-Version:     1.0.0
+Version:     2.0.0
 Author:      Labartise
 Author URI:  https://labartise.com
 License:     GPL2
