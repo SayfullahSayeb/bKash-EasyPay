@@ -1,5 +1,3 @@
-# bKash EasyPay WordPress Plugin
-
 A WordPress plugin that adds bKash as a manual payment method to WooCommerce.
 
 ## Features
@@ -48,3 +46,4 @@ For support, please visit [Labartise](https://labartise.com/contact-us/)
 ## License
 
 This project is licensed under GPL2. See the LICENSE file for details.
+
