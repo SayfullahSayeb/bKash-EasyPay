@@ -568,7 +568,6 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
                 <h1 style="margin: 0;"><?php esc_html_e('bKash Transaction Information', 'stb'); ?></h1>
                 <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=pay_bKash_transactions&action=export_csv'), 'export_bkash_csv'); ?>" 
                    class="button button-secondary">
-                    <span class="dashicons dashicons-download" style="vertical-align: middle; margin-right: 5px;"></span>
                     <?php esc_html_e('Export to CSV', 'stb'); ?>
                 </a>
             </div>
