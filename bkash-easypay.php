@@ -9,7 +9,7 @@ Author URI:  https://labartise.com
 License:     GPL2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Requires PHP: 5.6
-GitHub Plugin URI: https://github.com/SayfullahSayeb/bKash-EasyPay-WordPress-Plugin
+GitHub Plugin URI: https://github.com/SayfullahSayeb/bKash-EasyPay
 */
 
 defined('ABSPATH') or die('Only a foolish person try to access directly to see this white page. :-) ');
