@@ -173,7 +173,7 @@ public function payment_fields(){
             this.innerText = 'Copied!';
             var button = this;
             setTimeout(function() {
-                button.innerText = 'Copy';
+                button.innerText = 'Copy Number';
             }, 2000);
         });
 
